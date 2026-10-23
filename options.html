@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>DiArc — Settings</title>
+  <link rel="icon" href="icons/diarc-swoosh-32.png" type="image/png">
+  <link rel="stylesheet" href="options.css">
+  <script src="options.js" type="module"></script>
+</head>
+<body>
+  <div class="settings-shell">
+    <header class="topbar">
+      <a class="brand" href="#keyboard" aria-label="DiArc settings"><img class="brand-mark" src="icons/diarc-swoosh-256.png" width="80" height="80" alt=""><span>DiArc</span></a>
+      <p class="brand-subline">A beautiful Arc-like floating command bar for Dia and other Chromium browsers.</p>
+    </header>
+    <div class="settings-layout">
+      <nav class="local-nav" aria-label="Settings sections">
+        <p class="nav-caption">Preferences</p>
+        <a href="#keyboard">Keyboard</a>
+        <a href="#general">General</a>
+        <a href="#customize">Customize</a>
+        <a href="#sources">Search sources</a>
+      </nav>
+      <main>
+        <header class="page-heading">
+          <h1>Make it yours.</h1>
+          <p>A few thoughtful controls. A little less in your way.</p>
+        </header>
+        <section id="keyboard" aria-labelledby="shortcuts-heading">
+          <div class="section-heading"><h2 id="shortcuts-heading">Keyboard shortcuts</h2><p>Your command bar starts with the right keys.</p></div>
+          <div class="shortcut-setup">
+            <p class="shortcut-setup-title">Set your keyboard shortcuts</p>
+            <p>Choose your preferred keys in your browser’s extension settings.</p>
+            <a id="shortcut-settings-link" class="shortcut-settings-link" href="chrome://extensions/shortcuts" target="_blank" rel="noopener" aria-label="Configure keyboard shortcuts at chrome://extensions/shortcuts"><code>chrome://extensions/shortcuts</code><span aria-hidden="true">↗</span></a>
+            <p class="shortcut-setup-hint">Opens the shortcut configuration page in a new tab.</p>
+            <aside class="shortcut-recommendation" aria-labelledby="shortcut-recommendation-heading">
+              <p id="shortcut-recommendation-heading">Recommended setup</p>
+              <p>If your browser supports native shortcut remapping, first unassign <kbd id="recommended-new-shortcut">⌘T / Ctrl+T</kbd> and <kbd id="recommended-address-shortcut">⌘L / Ctrl+L</kbd> from its new-tab and address-bar actions. Then assign those keys to DiArc’s <strong>New tab</strong> and <strong>Edit current address</strong> commands instead.</p>
+              <p>Some Chromium browsers reserve these keys. If you cannot release them, use <kbd id="fallback-new-shortcut">⌥T / Alt+T</kbd> and <kbd id="fallback-address-shortcut">⌥L / Alt+L</kbd>.</p>
+            </aside>
+            <p id="shortcut-status" class="shortcut-status" role="status" aria-live="polite"></p>
+          </div>
+          <div class="settings-card shortcut-card">
+            <div class="shortcut"><span>Open in a new tab</span><kbd id="new-shortcut">⌥ T / Alt T</kbd></div>
+            <div class="shortcut"><span>Edit the current address</span><kbd id="address-shortcut">⌥ L / Alt L</kbd></div>
+            <div class="shortcut"><span>Move through results</span><div class="key-group"><kbd>↑</kbd><kbd>↓</kbd></div></div>
+            <div class="shortcut"><span>Open selected result</span><kbd>↵</kbd></div>
+          </div>
+        </section>
+        <form id="settings">
+          <fieldset id="settings-fields" disabled aria-label="Command bar preferences">
+          <section id="general" aria-labelledby="general-heading">
+            <div class="section-heading"><h2 id="general-heading">General</h2><p>The essentials for your everyday browsing.</p></div>
+            <div class="settings-card">
+              <div class="setting"><div class="setting-copy"><label for="theme">Appearance</label><p>Set the mood, or follow your system.</p></div><div class="select-field"><select id="theme" name="theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select><svg class="select-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m4 6 4 4 4-4"/></svg></div></div>
+              <div class="setting"><div class="setting-copy"><label for="searchEngine">Search engine</label><p>Where your searches take you.</p></div><div class="select-field"><select id="searchEngine" name="searchEngine"><option value="google">Google</option><option value="duckduckgo">DuckDuckGo</option><option value="bing">Bing</option></select><svg class="select-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m4 6 4 4 4-4"/></svg></div></div>
+              <div class="setting"><div class="setting-copy"><label for="maxResults">Maximum results</label><p id="results-help">1–20 results, including your typed address or search.</p></div><input id="maxResults" name="maxResults" type="number" min="1" max="20" step="1" required aria-describedby="results-help"></div>
+            </div>
+          </section>
+          <section id="customize" aria-labelledby="customize-heading">
+            <div class="section-heading"><h2 id="customize-heading">Customize</h2><p>A command bar that fits the way you browse.</p></div>
+            <div class="settings-card">
+              <div class="setting"><div class="setting-copy"><label for="overlayWidth">Overlay width</label><p id="width-help">Default: 75vh. Also accepts px, vw, or %.</p></div><input class="length-input" id="overlayWidth" name="overlayWidth" type="text" placeholder="75vh" autocomplete="off" spellcheck="false" maxlength="12" aria-describedby="width-help"></div>
+              <div class="setting"><div class="setting-copy"><label for="overlayHeight">Overlay height</label><p id="height-help">Maximum expanded height. Default: 75vh.</p></div><input class="length-input" id="overlayHeight" name="overlayHeight" type="text" placeholder="75vh" autocomplete="off" spellcheck="false" maxlength="12" aria-describedby="height-help"></div>
+              <div class="setting"><div class="setting-copy"><label for="backgroundBlur">Background blur</label><p id="blur-help">Soften the page behind the command bar.</p></div><input class="toggle-input" id="backgroundBlur" name="backgroundBlur" type="checkbox" aria-describedby="blur-help"></div>
+            </div>
+            <h3 class="customize-subheading">Built-in quick actions</h3>
+            <p class="section-note action-help">All off by default. Enable only the actions you want.</p>
+            <div class="settings-card">
+              <label class="quick-toggle"><span>New tab<small>Add an explicit new-tab action in address mode.</small></span><input class="toggle-input" type="checkbox" name="enabledQuickActions" value="new-tab"></label>
+              <label class="quick-toggle"><span>ChatGPT<small>Open your text in ChatGPT.</small></span><input class="toggle-input" type="checkbox" name="enabledQuickActions" value="chatgpt"></label>
+              <label class="quick-toggle"><span>Claude<small>Open your text in Claude.</small></span><input class="toggle-input" type="checkbox" name="enabledQuickActions" value="claude"></label>
+            </div>
+            <p class="section-note">Quick actions appear above source matches while you type. Nothing is sent to these services until you select an action.</p>
+            <h3 class="customize-subheading">Custom quick actions</h3>
+            <p class="section-note action-help">Use <code>{query}</code> in an HTTP(S) URL for your typed text. Actions open in a new tab.</p>
+            <div id="custom-actions" class="custom-actions"></div>
+            <p id="custom-empty" class="section-note">No custom actions yet.</p>
+            <button id="add-custom-action" class="add-action" type="button">Add quick action</button>
+          </section>
+          <section id="sources" aria-labelledby="sources-heading">
+            <div class="section-heading"><h2 id="sources-heading">Search sources</h2><p id="sources-help">Choose what appears. Move a source up to give it priority.</p></div>
+            <ol class="source-list settings-card" id="source-list" aria-label="Result sources in priority order" aria-describedby="sources-help"></ol>
+            <p class="section-note">Results follow this order. Your typed address or search always comes first, even with every source off.</p>
+          </section>
+          <p class="autosave-status" id="save-status" role="status" aria-live="polite">Changes save automatically on this browser.</p>
+          </fieldset>
+        </form>
+        <footer>Private by design. No analytics. No remote suggestions.</footer>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

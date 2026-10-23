@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "DiArc",
+  "version": "1.2.0",
+  "description": "Bring back a beautiful Arc-like floating command bar in Dia. Customizable, fast, minimal.",
+  "minimum_chrome_version": "111",
+  "permissions": ["activeTab", "scripting", "tabs", "history", "bookmarks", "storage"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "options_page": "options.html",
+  "icons": { "16": "icons/diarc-swoosh-16.png", "32": "icons/diarc-swoosh-32.png", "48": "icons/diarc-swoosh-48.png", "128": "icons/diarc-swoosh-128.png" },
+  "action": {
+    "default_title": "DiArc · Open command bar",
+    "default_icon": { "16": "icons/diarc-swoosh-16.png", "32": "icons/diarc-swoosh-32.png" }
+  },
+  "commands": {
+    "new-tab": {
+      "suggested_key": { "default": "Alt+T", "mac": "Alt+T" },
+      "description": "Open command bar · new tab"
+    },
+    "edit-address": {
+      "suggested_key": { "default": "Alt+L", "mac": "Alt+L" },
+      "description": "Edit current address · same tab"
+    }
+  }
+}
