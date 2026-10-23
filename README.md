@@ -1,17 +1,37 @@
-<p align="center">
+<div align="center">
   <img src="assets/readme-preview.png" width="100%" alt="DiArc floating command bar with search and open-tab results">
-</p>
 
-<p align="center">A beautiful Arc-like floating command bar for Dia and other Chromium browsers.</p>
 
-<h3 align="center">Customizable</h3>
-<p align="center">Your shortcuts, sources, quick actions, and layout.</p>
 
-<h3 align="center">Fast</h3>
-<p align="center">Find tabs, bookmarks, and history from your keyboard.</p>
-
-<h3 align="center">Minimal</h3>
-<p align="center">One floating bar. No new-tab takeover. No tracking.</p>
+<table>
+  <tr>
+    <td align="left" width="33%">
+      <h3>Customizable</h3>
+      <p>
+        Your shortcuts,
+        sources, quick actions,<br>
+        and layout.
+      </p>
+    </td>
+    <td align="left" width="34%">
+      <h3>Fast</h3>
+      <p>
+        Find tabs, bookmarks,<br>
+        and history <br>
+        from your keyboard.
+      </p>
+    </td>
+    <td align="left" width="33%">
+      <h3>Minimal</h3>
+      <p>
+        One floating bar.<br>
+        No new-tab takeover.<br>
+        No tracking.
+      </p>
+    </td>
+  </tr>
+</table>
+</div>
 
 ## Install
 
