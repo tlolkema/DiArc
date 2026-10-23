@@ -1,8 +1,6 @@
 <p align="center">
-  <img src="icons/diarc-swoosh-256.png" width="128" height="128" alt="DiArc logo">
+  <img src="assets/readme-preview.png" width="100%" alt="DiArc floating command bar with search and open-tab results">
 </p>
-
-<h1 align="center">DiArc</h1>
 
 <p align="center">A beautiful Arc-like floating command bar for Dia and other Chromium browsers.</p>
 
@@ -27,5 +25,7 @@
 - **⌥T / Alt+T** — open the overlay, then submit to open a new tab.
 - **⌥L / Alt+L** — edit the current URL and navigate in the same tab.
 - **↑ ↓** to select · **Enter** to open · **Esc** to dismiss.
+
+Three results by default. The bar stays one-third down the screen as results open beneath it.
 
 Customize sources, quick actions, size, and blur in **Settings**. Changes save automatically.
