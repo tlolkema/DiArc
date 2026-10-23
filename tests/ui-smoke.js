@@ -4,6 +4,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
 
 const exec = promisify(execFile);
 const directory = fileURLToPath(new URL('..', import.meta.url));
@@ -12,7 +13,15 @@ async function browser(...args) {
   const { stdout } = await exec('agent-browser', args, { env, timeout: 30000, maxBuffer: 1024 * 1024 });
   return stdout.trim();
 }
-async function evaluate(fn) { return browser('eval', `(${fn.toString()})()`); }
+async function evaluate(fn, ...args) { return browser('eval', `(${fn.toString()})(${args.map(value => JSON.stringify(value)).join(',')})`); }
+
+const fixture = createServer((request, response) => {
+  if (request.url === '/favicon.ico') { response.writeHead(204); response.end(); return; }
+  response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+  response.end('<!doctype html><html lang="en"><head><title>DiArc site-access test</title></head><body><h1>Local test page</h1></body></html>');
+});
+await new Promise((resolve, reject) => { fixture.once('error', reject); fixture.listen(0, '127.0.0.1', resolve); });
+const fixtureURL = `http://127.0.0.1:${fixture.address().port}/`;
 
 try {
   await browser('--extension', directory, 'open', 'chrome://extensions');
@@ -351,7 +360,28 @@ try {
     }
     throw new Error('The shortcut URL did not open the browser shortcut configuration page.');
   }));
+  console.log(await evaluate(async fixtureURL => {
+    const permissions = await chrome.permissions.getAll();
+    if (!['http://*/*', 'https://*/*'].every(origin => permissions.origins.includes(origin))) throw new Error('All-site HTTP/HTTPS access must be granted in the test installation.');
+    const tab = await chrome.tabs.create({ url: fixtureURL, active: false });
+    try {
+      for (let i = 0; i < 150 && (await chrome.tabs.get(tab.id)).status !== 'complete'; i++) await new Promise(resolve => setTimeout(resolve, 20));
+      const before = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => Boolean(document.querySelector('#still-command-bar')) });
+      if (before[0].result) throw new Error('Opening a website must not automatically inject the overlay.');
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['palette.js', 'content.js'] });
+      const css = await (await fetch(chrome.runtime.getURL('palette.css'))).text();
+      const response = await chrome.tabs.sendMessage(tab.id, { type: 'still:open', mode: 'new', css });
+      if (!response?.ok) throw new Error('The website content-script bridge must open the overlay.');
+      const after = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => Boolean(document.querySelector('#still-command-bar')?.isConnected) });
+      if (!after[0].result) throw new Error('The overlay host must exist on the website.');
+      return 'PASS: all-site access and the real website injection bridge work without a toolbar click';
+    } finally {
+      await chrome.tabs.remove(tab.id);
+    }
+  }, fixtureURL));
   assert.equal(await browser('errors'), '', 'The browser must not report page errors.');
 } finally {
   await browser('close').catch(() => {});
+  fixture.closeAllConnections();
+  await new Promise(resolve => fixture.close(resolve));
 }

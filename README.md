@@ -19,7 +19,7 @@
 
 1. [Download DiArc](https://github.com/tlolkema/DiArc/archive/refs/heads/main.zip) and unzip it.
 2. Open your browser’s extensions page, such as `chrome://extensions`.
-3. Enable **Developer mode** → **Load unpacked** → select the folder containing `manifest.json`.
+3. Enable **Developer mode** → **Load unpacked** → select the folder containing `manifest.json`. Allow the requested site access.
 4. Settings opens automatically. Choose your shortcuts and make it yours.
 
 ## Use

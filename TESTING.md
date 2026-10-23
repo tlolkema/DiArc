@@ -23,7 +23,8 @@ The 48 dependency-free Node tests cover:
 - Partial browser API failures
 - On-demand injection and toolbar warning reset
 - No native new-tab override or launcher files
-- No persistent website permissions
+- HTTP/HTTPS access on all sites, without automatic content scripts
+- Browser-protected pages remain unavailable for overlays
 - DiArc branding and the supplied rainbow logo before the wordmark
 - Keyboard setup appears first with a clickable shortcut-configuration URL
 - Optimized square PNGs and matching toolbar/manifest icon paths
@@ -87,7 +88,9 @@ The suite loads the shipped palette over the **existing settings page** as a tes
 - Older worker responses with missing layout preferences use safe defaults instead of throwing
 - No browser page errors during these checks
 
-The harness does not test the content-script injection bridge or native extension accelerators. Those need the manual checks below. Dia-specific behavior was not tested directly.
+A separate local HTTP fixture checks the real content-script injection bridge. It verifies that HTTP/HTTPS access is granted, pages do not automatically receive an overlay, and the extension can inject and open the bar without a prior toolbar click or active-tab grant. The test server and browser session close after the suite.
+
+Native extension accelerators still need the manual checks below. Dia-specific behavior was not tested directly.
 
 ## Manual checks
 

@@ -78,7 +78,7 @@ async function indicateAvailability(tabId, available) {
 async function openPalette(tab, mode) {
   if (!tab?.id) return;
   try {
-    // activeTab is granted by the toolbar action or a registered command.
+    // Host permissions cover normal websites. activeTab also supports user-invoked access.
     // The command bar is only an overlay. Never create a launcher or fallback tab.
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['palette.js', 'content.js'] });
     stylesheet ||= fetch(chrome.runtime.getURL('palette.css')).then(response => response.text());

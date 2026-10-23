@@ -246,10 +246,10 @@ test('settings autosave without a button and prevent edits before preferences lo
   assert.match(options, /Changes save automatically on this browser/);
   assert.doesNotMatch(options, /type="submit"|save-button|Save changes|Save preferences/);
 });
-test('manifest requests no permanent website access or remote resources', async () => {
+test('all-site access covers web pages without automatic content scripts', async () => {
   const manifest = JSON.parse(await readFile(new URL('../manifest.json', import.meta.url)));
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.host_permissions, undefined);
+  assert.deepEqual(manifest.host_permissions, ['http://*/*', 'https://*/*']);
   assert.equal(manifest.content_scripts, undefined);
   assert.equal(manifest.web_accessible_resources, undefined);
   assert.ok(manifest.permissions.includes('activeTab'));
