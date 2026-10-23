@@ -10,7 +10,8 @@ test('settings have defaults and bounded result limits', () => {
   assert.equal(settingsFrom({ maxResults: 90 }).maxResults, 20);
   assert.equal(settingsFrom({ maxResults: -2 }).maxResults, 1);
   assert.equal(settingsFrom({ maxResults: '6' }).maxResults, 6);
-  assert.equal(settingsFrom({ maxResults: 'bad' }).maxResults, 8);
+  assert.equal(settingsFrom({ maxResults: 'bad' }).maxResults, 3);
+  assert.equal(DEFAULTS.maxResults, 3);
   assert.equal(settingsFrom({ searchEngine: '__proto__', theme: 'pink' }).searchEngine, 'google');
 });
 
@@ -144,8 +145,51 @@ test('duplicate URLs retain the highest-priority enabled source', () => {
   assert.equal(rankResults('design', candidates, 8, Date.now(), { sourceOrder: ['history', 'bookmark', 'tab'] })[0].source, 'history');
   assert.equal(rankResults('design', candidates, 8, Date.now(), { enabledSources: ['bookmark'] })[0].source, 'bookmark');
 });
-test('recency and frequency break otherwise equal history matches', () => {
+test('history lists the last visited first regardless of match strength or frequency', () => {
   const now = Date.now();
-  const items = rankResults('design', [candidate('history', 'https://design.example/old', '', { lastVisitTime: now - 86400000 * 90 }), candidate('history', 'https://design.example/recent', '', { lastVisitTime: now, visitCount: 10 })], 8, now);
-  assert.equal(items[0].url, 'https://design.example/recent');
+  const items = rankResults('design', [
+    candidate('history', 'https://design.example/old', 'design', { lastVisitTime: now - 60000, visitCount: 10000 }),
+    candidate('history', 'https://other.example/design/new', 'Other notes', { lastVisitTime: now, visitCount: 1 }),
+    candidate('history', 'https://other.example/design/middle', 'Design collection', { lastVisitTime: now - 1000, visitCount: 100 })
+  ], 8, now);
+  assert.deepEqual(items.map(item => item.lastVisitTime), [now, now - 1000, now - 60000]);
+});
+test('history is sorted by last visit before the result limit applies', () => {
+  const now = Date.now();
+  const items = [
+    candidate('history', 'https://design.example/old', 'design', { lastVisitTime: now - 60000, visitCount: 10000 }),
+    candidate('history', 'https://other.example/design/new', 'Other notes', { lastVisitTime: now })
+  ];
+  assert.equal(rankResults('design', items, 1, now)[0].url, 'https://other.example/design/new');
+});
+test('duplicate history URLs keep the most recent matching visit', () => {
+  const now = Date.now();
+  const older = candidate('history', 'https://example.com/design', 'design', { lastVisitTime: now - 60000, visitCount: 10000 });
+  const newer = { ...older, title: 'Latest notes', lastVisitTime: now, visitCount: 1 };
+  for (const items of [[older, newer], [newer, older]]) {
+    const ranked = rankResults('design', items);
+    assert.equal(ranked.length, 1);
+    assert.equal(ranked[0].title, 'Latest notes');
+    assert.equal(ranked[0].lastVisitTime, now);
+  }
+});
+test('history entries without a finite visit time follow dated entries', () => {
+  const items = rankResults('design', [
+    candidate('history', 'https://design.example/missing', 'design'),
+    candidate('history', 'https://design.example/invalid', 'design', { lastVisitTime: NaN }),
+    candidate('history', 'https://design.example/infinite', 'design', { lastVisitTime: Infinity }),
+    candidate('history', 'https://other.example/design/dated', 'Other notes', { lastVisitTime: 1 })
+  ], 8);
+  assert.equal(items.length, 4);
+  assert.equal(items[0].url, 'https://other.example/design/dated');
+});
+test('tabs and bookmarks still rank by match strength rather than visit time', () => {
+  const now = Date.now();
+  for (const source of ['tab', 'bookmark']) {
+    const items = rankResults('design', [
+      candidate(source, 'https://other.example/design/new', 'Other notes', { lastVisitTime: now, lastAccessed: now }),
+      candidate(source, 'https://design.example/old', 'design', { lastVisitTime: now - 86400000 * 90, lastAccessed: now - 86400000 * 90 })
+    ], 8, now);
+    assert.equal(items[0].url, 'https://design.example/old');
+  }
 });

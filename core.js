@@ -1,7 +1,7 @@
 export const SOURCES = Object.freeze(['tab', 'bookmark', 'history']);
 export const QUICK_ACTIONS = Object.freeze(['new-tab', 'chatgpt', 'claude']);
 export const DEFAULTS = Object.freeze({
-  maxResults: 8,
+  maxResults: 3,
   searchEngine: 'google',
   theme: 'system',
   enabledSources: SOURCES,
@@ -144,10 +144,13 @@ function relevance(item, query, now) {
   return score;
 }
 
-export function rankResults(query, candidates, limit = 8, now = Date.now(), preferences = DEFAULTS) {
+export function rankResults(query, candidates, limit = DEFAULTS.maxResults, now = Date.now(), preferences = DEFAULTS) {
   if (!query.trim()) return [];
   const { enabledSources, sourceOrder } = settingsFrom(preferences);
+  const lastVisit = item => Number.isFinite(item.lastVisitTime) ? item.lastVisitTime : 0;
   const compare = (a, b) => sourceOrder.indexOf(a.source) - sourceOrder.indexOf(b.source)
+    // History is chronological. Match quality only breaks equal visit times.
+    || (a.source === 'history' && b.source === 'history' ? lastVisit(b) - lastVisit(a) : 0)
     || b.score - a.score || a.url.localeCompare(b.url);
   const unique = new Map();
   for (const candidate of candidates) {

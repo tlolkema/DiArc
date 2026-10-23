@@ -7,14 +7,16 @@ npm test
 npm run check
 ```
 
-The 56 dependency-free Node tests cover:
+The 68 dependency-free Node tests cover:
 
 - Settings open automatically on first install, not on updates or browser upgrades
 - Settings defaults, validation, result limits, and migration of older preferences
 - Enabled sources, custom priority, deduplication, and all-disabled behavior
 - Disabled sources are not queried
 - URL resolution, search engines, and unsafe schemes
-- Ranking, query matching, recency, and frequency
+- History ordered by last visit, newest first, before applying result limits
+- Recent history duplicates retained and missing visit times placed last
+- Source priority, query matching, and relevance ranking for tabs and bookmarks
 - New-tab versus same-tab submission
 - Opening either overlay mode does not create or navigate a tab
 - Protected pages show a toolbar warning without opening a fallback page
@@ -36,6 +38,9 @@ The 56 dependency-free Node tests cover:
 - Custom action navigation resolves current saved preferences and opens a new tab
 - Unsafe templates, credential URLs, and query-controlled hostnames are rejected
 - Auto-saving settings with no save button and no edits before preferences load
+- Native modal dialog lifecycle and a default limit of three results
+- Script-free input frame without web-accessible extension resources
+- Cached favicon lookup, bounded memory, unavailable icons, and vector fallback
 
 ## Browser regression suite
 
@@ -84,6 +89,11 @@ The suite loads the shipped palette over the **existing settings page** as a tes
 - Results show enabled quick actions before matches in configured source priority
 - The overlay uses the configured width, maximum height, and fixed blur when enabled
 - The initial bar remains compact despite its configured maximum height
+- The bar is anchored at one-third of the viewport and does not move as results change
+- Background inputs cannot take focus while the native modal is open
+- Typing is available immediately, even while initialization is delayed
+- Late initialization does not overwrite text typed in new-tab or address mode
+- Cached favicons load on the left; broken or disallowed images retain the vector icon
 - Typing and backspace retain visible results while responses are pending
 - Search requests debounce to the latest query
 - Old rows cannot navigate during a pending search
@@ -95,7 +105,21 @@ The suite loads the shipped palette over the **existing settings page** as a tes
 - Older worker responses with missing layout preferences use safe defaults instead of throwing
 - No browser page errors during these checks
 
-A separate local HTTP fixture checks the real content-script injection bridge. It verifies that HTTP/HTTPS access is granted, pages do not automatically receive an overlay, and the extension can inject and open the bar without a prior toolbar click or active-tab grant. The test server and browser session close after the suite.
+A separate local HTTP fixture checks the production content-script bridge. Its capture handlers cancel keyboard, pointer, paste, and input events. It repeatedly attempts to focus its composer. Its CSP blocks frame URLs and inline styles.
+
+The fixture checks:
+
+- Injection without a prior toolbar click
+- A cached website favicon
+- A script-free blank frame inside the native modal, without another tab or extension page
+- Real clicks and keystrokes reach DiArc, not the site composer or its capture handlers
+- The one-third position and blur on/off settings remain correct
+- Escape restores page focus
+- The same frame reopens in address mode, selects the current URL, and accepts more real typing
+
+The test server and disposable browser session close after the suite.
+
+Version 1.2.5 also passed a typing check on the public ChatGPT site in a fresh Chromium session. The site composer was present. Text reached DiArc, not the site composer. No message was submitted. A logged-in Dia session still requires manual verification.
 
 Native extension accelerators still need the manual checks below. Dia-specific behavior was not tested directly.
 

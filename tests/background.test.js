@@ -115,6 +115,20 @@ test('configured source priority applies before the total result cap', async () 
   assert.deepEqual(sourceCalls, ['history', 'bookmark', 'tab']);
   assert.deepEqual(result.items.map(item => item.source), ['input', 'history', 'bookmark']);
 });
+test('history search returns the newest visits first within the total result cap', async () => {
+  const now = Date.now();
+  values.maxResults = 3;
+  values.enabledSources = ['history'];
+  history = [
+    { title: 'design', url: 'https://design.example/old', lastVisitTime: now - 60000, visitCount: 10000 },
+    { title: 'Other notes', url: 'https://other.example/design/new', lastVisitTime: now, visitCount: 1 },
+    { title: 'Design collection', url: 'https://other.example/design/middle', lastVisitTime: now - 1000, visitCount: 100 }
+  ];
+  const result = await message({ type: 'still:search', query: 'design' });
+  assert.deepEqual(sourceCalls, ['history']);
+  assert.deepEqual(result.items.map(item => item.source), ['input', 'history', 'history']);
+  assert.deepEqual(result.items.slice(1).map(item => item.url), ['https://other.example/design/new', 'https://other.example/design/middle']);
+});
 test('enabled quick actions precede source matches and respect the total cap', async () => {
   values.enabledQuickActions = ['chatgpt', 'claude'];
   values.maxResults = 3;
@@ -246,6 +260,19 @@ test('settings autosave without a button and prevent edits before preferences lo
   assert.match(options, /Changes save automatically on this browser/);
   assert.doesNotMatch(options, /type="submit"|save-button|Save changes|Save preferences/);
 });
+test('the overlay uses native modal focus isolation', async () => {
+  const palette = await readFile(new URL('../palette.js', import.meta.url), 'utf8');
+  assert.match(palette, /document\.createElement\('dialog'\)/);
+  assert.match(palette, /layer\.showModal\(\)/);
+  assert.match(palette, /layer\.close\(\)/);
+});
+test('website input uses a script-free frame without exposing extension resources', async () => {
+  const content = await readFile(new URL('../content.js', import.meta.url), 'utf8');
+  assert.match(content, /document\.createElement\('iframe'\)/);
+  assert.match(content, /frame\.setAttribute\('sandbox', 'allow-same-origin'\)/);
+  assert.match(content, /frame\.contentDocument/);
+  assert.doesNotMatch(content, /allow-scripts|srcdoc|frame\.src\s*=/);
+});
 test('all-site access covers web pages without automatic content scripts', async () => {
   const manifest = JSON.parse(await readFile(new URL('../manifest.json', import.meta.url)));
   assert.equal(manifest.manifest_version, 3);
@@ -253,4 +280,5 @@ test('all-site access covers web pages without automatic content scripts', async
   assert.equal(manifest.content_scripts, undefined);
   assert.equal(manifest.web_accessible_resources, undefined);
   assert.ok(manifest.permissions.includes('activeTab'));
+  assert.ok(manifest.permissions.includes('favicon'));
 });

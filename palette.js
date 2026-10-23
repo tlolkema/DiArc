@@ -9,12 +9,23 @@
     history: '<path d="M3 11a9 9 0 1 1 2 7M3 4v7h7M12 7v5l3 2"/>',
     arrow: '<path d="M4 12h15m-6-6 6 6-6 6"/>'
   };
-  function icon(name) {
+  function icon(name, document = globalThis.document) {
     const span = document.createElement('span');
     span.className = 'still-icon';
     // Icon markup is constant. Browser data only enters the DOM through textContent.
     span.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${symbols[name] || symbols.address}</svg>`;
     return span;
+  }
+  function resultIcon(item, symbol, document = globalThis.document) {
+    const fallback = icon(symbol, document);
+    if (typeof item.favicon !== 'string' || item.favicon.length > 45000 || !/^data:image\/png;base64,[A-Za-z0-9+/]+=*$/.test(item.favicon)) return fallback;
+    const image = document.createElement('img');
+    image.className = 'still-favicon'; image.alt = ''; image.width = 20; image.height = 20;
+    image.decoding = 'async'; image.referrerPolicy = 'no-referrer';
+    image.addEventListener('load', () => { if (image.naturalWidth) fallback.replaceChildren(image); });
+    // Keep the existing vector icon unless the cached favicon actually loads.
+    image.src = item.favicon;
+    return fallback;
   }
   function friendlyUrl(value) {
     try {
@@ -29,16 +40,19 @@
     return result;
   }
 
-  function mount({ root, css, onClose = () => {} }) {
+  function mount({ root, css, onClose = () => {}, onAppearance = () => {} }) {
+    const document = root.ownerDocument || root;
     if (css) {
-      const sheet = new CSSStyleSheet();
+      const sheet = new document.defaultView.CSSStyleSheet();
       sheet.replaceSync(css);
       root.adoptedStyleSheets = [sheet];
     }
-    const layer = document.createElement('div');
+    const layer = document.createElement('dialog');
     layer.className = 'still-layer is-overlay';
+    layer.setAttribute('aria-label', 'DiArc command bar');
+    layer.setAttribute('aria-modal', 'true');
     layer.innerHTML = `
-      <section class="still-panel" role="dialog" aria-modal="true" aria-label="DiArc command bar" data-theme="system">
+      <section class="still-panel" data-theme="system">
         <div class="still-bar">
           <span class="still-search-icon" aria-hidden="true"></span>
           <input class="still-input" type="text" role="combobox" aria-label="Search or enter an address" aria-autocomplete="list" aria-expanded="false" aria-controls="still-results" autocomplete="off" spellcheck="false" autocapitalize="off" maxlength="2048">
@@ -57,8 +71,8 @@
     const body = layer.querySelector('.still-body');
     const status = layer.querySelector('.still-status');
     const submitButton = layer.querySelector('.still-submit');
-    submitButton.append(icon('submit'));
-    layer.querySelector('.still-search-icon').append(icon('search'));
+    submitButton.append(icon('submit', document));
+    layer.querySelector('.still-search-icon').append(icon('search', document));
     let items = [], selected = -1, mode = 'new', sequence = 0, timer, busy = false, generation = 0, pendingSearch = false;
     let previousFocus;
 
@@ -69,6 +83,12 @@
       const opensNew = mode !== 'address' || (!pendingSearch && Boolean(items[selected]?.actionId));
       submitButton.setAttribute('aria-label', opensNew ? 'Open in a new tab' : 'Navigate in this tab');
       layer.querySelector('.still-enter-label').textContent = opensNew ? 'to open in a new tab' : 'to navigate in this tab';
+    }
+    function updateModeLabels() {
+      input.placeholder = mode === 'address' ? 'Enter an address…' : 'Search or enter a URL…';
+      input.setAttribute('aria-label', mode === 'address' ? 'Edit current address' : 'Search or enter an address');
+      layer.setAttribute('aria-label', mode === 'address' ? 'DiArc — edit current address' : 'DiArc — open a new tab');
+      updateActionHint();
     }
     function announce(text = '') {
       status.textContent = text;
@@ -104,7 +124,7 @@
         row.setAttribute('role', 'option');
         row.setAttribute('aria-selected', 'false');
         const symbol = item.source === 'input' ? (item.kind === 'search' ? 'search' : 'arrow') : (item.source === 'action' ? 'arrow' : item.source);
-        row.append(icon(symbol));
+        row.append(resultIcon(item, symbol, document));
         const text = document.createElement('span');
         text.className = 'still-result-text';
         const title = document.createElement('span');
@@ -139,9 +159,11 @@
       finally { busy = false; updateSubmit(); input.removeAttribute('aria-busy'); }
     }
     function close() {
+      if (!layer.open) return;
       sequence++;
       generation++;
       clearTimeout(timer);
+      layer.close();
       layer.hidden = true;
       previousFocus?.focus?.({ preventScroll: true });
       onClose();
@@ -193,6 +215,13 @@
         focusable[(index + (event.shiftKey ? -1 : 1) + focusable.length) % focusable.length].focus();
       }
     });
+    layer.addEventListener('cancel', event => { event.preventDefault(); dismiss(); });
+    layer.querySelector('.still-bar').addEventListener('pointerdown', event => {
+      if (event.target !== input && !submitButton.contains(event.target)) {
+        event.preventDefault();
+        input.focus({ preventScroll: true });
+      }
+    });
     layer.addEventListener('keyup', event => event.stopPropagation());
     layer.addEventListener('keypress', event => event.stopPropagation());
     layer.addEventListener('pointerdown', event => { if (event.target === layer) void dismiss(); });
@@ -200,16 +229,22 @@
 
     async function open(requestedMode) {
       const current = ++generation;
-      previousFocus = root.activeElement || document.activeElement;
+      if (!layer.open) previousFocus = root.activeElement || document.activeElement;
       mode = requestedMode === 'address' ? 'address' : 'new';
-      layer.hidden = false;
-      sequence++;
+      const initialSequence = ++sequence;
       clearTimeout(timer);
       clear();
       announce();
-      input.value = '';
-      input.disabled = true;
+      input.value = mode === 'address' ? location.href : '';
+      input.disabled = false;
+      updateModeLabels();
       updateSubmit();
+      layer.hidden = false;
+      // A native modal makes the underlying page inert, so site autofocus cannot
+      // take input away from the command bar while it is open.
+      if (!layer.open) layer.showModal();
+      input.focus({ preventScroll: true });
+      if (mode === 'address') input.select();
       try {
         const context = await request({ type: 'still:init', mode: requestedMode });
         if (current !== generation) return;
@@ -225,18 +260,17 @@
         layer.style.setProperty('--still-overlay-width', width.replace(/%$/, 'vw'));
         layer.style.setProperty('--still-overlay-height', height.replace(/%$/, 'vh'));
         layer.style.setProperty('--still-background-blur', `${blur}px`);
-        input.value = mode === 'address' ? context.currentUrl : '';
-        input.placeholder = mode === 'address' ? 'Enter an address…' : 'Search or enter a URL…';
-        input.setAttribute('aria-label', mode === 'address' ? 'Edit current address' : 'Search or enter an address');
-        panel.setAttribute('aria-label', mode === 'address' ? 'Edit current address' : 'Open a new tab');
-        updateActionHint();
+        onAppearance({ backgroundBlur: blurEnabled });
+        // Do not overwrite text entered while the worker was loading settings.
+        if (sequence === initialSequence) {
+          input.value = mode === 'address' ? (context.currentUrl || location.href) : '';
+          if (mode === 'address' && (root.activeElement || document.activeElement) === input) input.select();
+        }
+        updateModeLabels();
       } catch (error) { if (current === generation) announce(error.message); }
       finally {
         if (current === generation) {
-          input.disabled = false;
           updateSubmit();
-          input.focus({ preventScroll: true });
-          if (mode === 'address') input.select();
         }
       }
     }

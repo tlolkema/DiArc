@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "DiArc",
-  "version": "1.2.2",
+  "version": "1.2.5",
   "description": "Bring back a beautiful Arc-like floating command bar in Dia. Customizable, fast, minimal.",
   "minimum_chrome_version": "111",
-  "permissions": ["activeTab", "scripting", "tabs", "history", "bookmarks", "storage"],
+  "permissions": ["activeTab", "scripting", "tabs", "history", "bookmarks", "storage", "favicon"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "background": { "service_worker": "background.js", "type": "module" },
   "options_page": "options.html",

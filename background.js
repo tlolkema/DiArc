@@ -1,6 +1,8 @@
 import { DEFAULTS, settingsFrom, resolveInput, rankResults, safeUrl, quickActionRows } from './core.js';
+import { createFaviconLoader } from './favicons.js';
 
 let stylesheet;
+const getFavicon = createFaviconLoader({ getURL: path => chrome.runtime.getURL(path) });
 
 async function readSettings() {
   return settingsFrom(await chrome.storage.local.get(DEFAULTS));
@@ -32,6 +34,11 @@ async function search(query, sender, mode = 'new') {
   // The typed action counts toward the user's maximum.
   const matches = rankResults(text, candidates, sourceLimit, Date.now(), settings);
   const items = [{ ...action, source: 'input' }, ...quickActions, ...matches.filter(item => item.url !== action.url)];
+  await Promise.all(items.map(async item => {
+    if (item.source === 'input' && item.kind === 'search') return;
+    const favicon = await getFavicon(item.url);
+    if (favicon) item.favicon = favicon;
+  }));
   return {
     items,
     settings,

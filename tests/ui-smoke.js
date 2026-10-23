@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
 
 const exec = promisify(execFile);
 const directory = fileURLToPath(new URL('..', import.meta.url));
@@ -15,10 +16,24 @@ async function browser(...args) {
 }
 async function evaluate(fn, ...args) { return browser('eval', `(${fn.toString()})(${args.map(value => JSON.stringify(value)).join(',')})`); }
 
+const fixtureIcon = await readFile(new URL('../icons/diarc-swoosh-16.png', import.meta.url));
 const fixture = createServer((request, response) => {
-  if (request.url === '/favicon.ico') { response.writeHead(204); response.end(); return; }
-  response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-  response.end('<!doctype html><html lang="en"><head><title>DiArc site-access test</title></head><body><h1>Local test page</h1></body></html>');
+  if (request.url === '/favicon.ico') { response.writeHead(200, { 'Content-Type': 'image/png' }); response.end(fixtureIcon); return; }
+  response.writeHead(200, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Content-Security-Policy': "default-src 'none'; script-src 'unsafe-inline'; style-src 'none'; img-src 'self' data:; frame-src 'none'"
+  });
+  response.end(`<!doctype html><html lang="en"><head><title>DiArc site-access test</title><link rel="icon" href="/favicon.ico"></head>
+    <body><h1>Autofocusing test page</h1><input id="site-input" autofocus placeholder="Site composer">
+    <script>const composer = document.querySelector('#site-input'); globalThis.focusAttempts = 0;
+    function stealFocus() { focusAttempts++; composer.focus(); }
+    setInterval(stealFocus, 15); document.addEventListener('focusin', stealFocus, true);
+    globalThis.interceptedEvents = 0;
+    for (const type of ['pointerdown', 'keydown', 'keypress', 'keyup', 'beforeinput', 'paste']) window.addEventListener(type, event => {
+      if (event.target === composer) return;
+      interceptedEvents++; event.preventDefault(); event.stopImmediatePropagation(); stealFocus();
+    }, true);</script>
+    </body></html>`);
 });
 await new Promise((resolve, reject) => { fixture.once('error', reject); fixture.listen(0, '127.0.0.1', resolve); });
 const fixtureURL = `http://127.0.0.1:${fixture.address().port}/`;
@@ -36,12 +51,15 @@ try {
   const page = `chrome-extension://${id}`;
   await browser('open', `${page}/options.html`);
   console.log(await evaluate(async () => {
+    const currentTab = await chrome.tabs.getCurrent();
+    await chrome.tabs.update(currentTab.id, { active: true });
+    await new Promise(resolve => requestAnimationFrame(resolve));
     const check = (value, message) => { if (!value) throw new Error(message); };
     const wait = async predicate => {
       for (let i = 0; i < 300; i++) { if (await predicate()) return; await new Promise(resolve => setTimeout(resolve, 10)); }
       throw new Error('Timed out waiting for settings.');
     };
-    await wait(() => document.querySelector('#maxResults').value === '8' && document.querySelectorAll('.source-item').length === 3);
+    await wait(() => document.querySelector('#maxResults')?.value === '3' && document.querySelectorAll('.source-item').length === 3);
     const brand = document.querySelector('.brand');
     const logo = brand.querySelector('.brand-mark');
     await wait(() => logo?.complete && logo.naturalWidth === 256);
@@ -305,17 +323,25 @@ try {
     const type = text => { input.value = text; input.dispatchEvent(new Event('input', { bubbles: true })); };
     await wait(() => !input.disabled);
     check(list.children.length === 0 && body.hidden, 'Initial bar must have no results.');
-    check(layer.classList.contains('is-overlay') && location.href === urlBefore, 'The bar must be an overlay on the existing page.');
+    check(layer.classList.contains('is-overlay') && layer.matches(':modal') && location.href === urlBefore, 'The bar must be a native modal overlay on the existing page.');
+    previousFocus.focus();
+    check(document.activeElement === input, 'The page must not take focus while the overlay is modal.');
+    layer.querySelector('.still-bar').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+    check(document.activeElement === input, 'Clicking empty bar space must keep the input focused.');
     check((await chrome.tabs.query({ currentWindow: true })).length === tabCount, 'Opening the overlay must not create a tab.');
     check(!document.querySelector('.still-settings,.still-close,.still-mode'), 'The bar must not contain removed controls.');
     await pause(160);
     const panelRect = layer.querySelector('.still-panel').getBoundingClientRect();
+    const barTop = layer.querySelector('.still-bar').getBoundingClientRect().top;
+    const barRect = layer.querySelector('.still-bar').getBoundingClientRect();
+    check(Math.abs(barRect.y + barRect.height / 2 - innerHeight / 3) < 1, 'The bar must be anchored one-third down the viewport.');
     check(Math.abs(panelRect.width - innerWidth * .5) < 1, `The overlay must use the configured viewport width (actual ${panelRect.width}, viewport ${innerWidth}, setting ${layer.style.getPropertyValue('--still-overlay-width')}, visibility ${document.visibilityState}).`);
     check(panelRect.height < 100 && getComputedStyle(layer).backdropFilter === 'blur(5px)', 'The empty bar must remain compact and apply the configured background blur.');
     check(Math.abs(parseFloat(getComputedStyle(layer.querySelector('.still-panel')).maxHeight) - innerHeight * .65) < 1, 'The overlay must apply its maximum configured height.');
     type('design');
     await wait(() => list.children.length === 6);
     const initialCount = list.children.length;
+    check(Math.abs(layer.querySelector('.still-bar').getBoundingClientRect().top - barTop) < 1, 'Expanding results must not move the bar.');
     check(JSON.stringify([...document.querySelectorAll('.still-source')].map(element => element.textContent)) === '["Search","Action","Action","Action","History","Bookmark"]', 'Quick actions must precede ranked source matches.');
     check([...list.children].some(row => row.textContent.includes('Search GitHub')), 'Custom actions must appear in the overlay.');
     const originalSend = chrome.runtime.sendMessage.bind(chrome.runtime);
@@ -342,9 +368,17 @@ try {
     pending[0].resolve({ items: [{ title: 'STALE', url: 'https://stale.example', source: 'history' }] });
     await pause(0);
     check(list.firstElementChild.textContent === firstText, 'Out-of-order responses must not replace current results.');
-    pending[1].resolve({ items: [{ title: 'CURRENT', url: 'https://current.example', source: 'history' }] });
+    const png = new Uint8Array(await (await fetch(chrome.runtime.getURL('icons/diarc-swoosh-16.png'))).arrayBuffer());
+    pending[1].resolve({ items: [
+      { title: 'CURRENT', url: 'https://current.example', source: 'history', favicon: `data:image/png;base64,${btoa(String.fromCharCode(...png))}` },
+      { title: 'Broken icon', url: 'https://broken.example', source: 'history', favicon: 'data:image/png;base64,AAAA' },
+      { title: 'External icon', url: 'https://external.example', source: 'history', favicon: 'https://tracking.invalid/favicon.ico' }
+    ] });
     await wait(() => list.firstElementChild?.textContent.includes('CURRENT'));
     check(!body.hidden && input.getAttribute('aria-activedescendant') === 'still-option-0', 'Fresh results must restore keyboard selection.');
+    await wait(() => list.firstElementChild.querySelector('.still-favicon')?.naturalWidth > 0);
+    check(list.children[1].querySelector('.still-icon svg') && list.children[2].querySelector('.still-icon svg'), 'Missing or disallowed favicons must keep the current vector fallback.');
+    check(Math.abs(layer.querySelector('.still-bar').getBoundingClientRect().top - barTop) < 1, 'Updating results and favicons must not move the bar.');
     type('next');
     await wait(() => pending.length === 3);
     type('');
@@ -352,6 +386,7 @@ try {
     pending[2].resolve({ items: [{ title: 'LATE', url: 'https://late.example', source: 'history' }] });
     await pause(0);
     check(body.hidden && list.children.length === 0, 'A late response must not reopen cleared results.');
+    check(Math.abs(layer.querySelector('.still-bar').getBoundingClientRect().top - barTop) < 1, 'Clearing results must not move the bar.');
     type('submit now');
     await wait(() => pending.length === 4);
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
@@ -380,8 +415,42 @@ try {
       check(layer.querySelector('.still-status').hidden && !input.disabled && input.placeholder.length > 0, 'Missing new preferences must not break the overlay.');
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     }
-    return 'PASS: overlay-only display, current address, dismissal, focus, live ranking, stable typing/backspace, debounce, stale-result protection, older-settings compatibility';
+    // Simulate a slow worker: typing and focus must work before init completes.
+    let releaseInit;
+    chrome.runtime.sendMessage = message => message.type === 'still:init'
+      ? new Promise(resolve => { releaseInit = resolve; }) : originalSend(message);
+    for (const mode of ['new', 'address']) {
+      const opening = palette.open(mode);
+      check(document.activeElement === input && !input.disabled, 'Focus must be available immediately, before settings load.');
+      type(mode === 'new' ? 'typed immediately' : 'https://edited.example/');
+      const expected = input.value;
+      releaseInit(await originalSend({ type: 'still:init', mode }));
+      await opening;
+      check(input.value === expected, 'Late initialization must not erase or reselect text already entered.');
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    }
+    chrome.runtime.sendMessage = originalSend;
+    await palette.open('new');
+    layer.dispatchEvent(new Event('cancel', { cancelable: true }));
+    check(layer.hidden && document.activeElement === previousFocus, 'Native dialog cancellation must dismiss and restore focus.');
+    return 'PASS: modal focus isolation, one-third anchor, stable results, favicon fallbacks, immediate typing, dismissal, and compatibility';
   }));
+  await browser('set', 'viewport', '390', '844');
+  console.log(await evaluate(async () => {
+    const palette = globalThis.StillPalette.mount({ root: document.body });
+    await palette.open('new');
+    const layer = document.querySelector('.still-layer[open]');
+    const bar = layer.querySelector('.still-bar');
+    const top = bar.getBoundingClientRect().top;
+    if (Math.abs(top + bar.getBoundingClientRect().height / 2 - innerHeight / 3) > 1) throw new Error('The mobile bar must also be anchored one-third down.');
+    const input = layer.querySelector('input'); input.value = 'design'; input.dispatchEvent(new Event('input', { bubbles: true }));
+    for (let i = 0; i < 300 && layer.querySelector('.still-body').hidden; i++) await new Promise(resolve => setTimeout(resolve, 10));
+    const panel = layer.querySelector('.still-panel').getBoundingClientRect();
+    if (layer.querySelector('.still-body').hidden || Math.abs(bar.getBoundingClientRect().top - top) > 1 || panel.bottom > innerHeight - 13 || panel.right > innerWidth - 13) throw new Error('Mobile results must grow below the stationary bar and stay in the viewport.');
+    palette.destroy();
+    return 'PASS: mobile one-third anchor and downward expansion without moving the bar';
+  }));
+  await browser('set', 'viewport', '1280', '900');
   console.log(await evaluate(async () => {
     const before = new Set((await chrome.tabs.query({})).map(tab => tab.id));
     document.querySelector('#shortcut-settings-link').click();
@@ -395,25 +464,114 @@ try {
     }
     throw new Error('The shortcut URL did not open the browser shortcut configuration page.');
   }));
-  console.log(await evaluate(async fixtureURL => {
+  const website = JSON.parse(await evaluate(async fixtureURL => {
     const permissions = await chrome.permissions.getAll();
     if (!['http://*/*', 'https://*/*'].every(origin => permissions.origins.includes(origin))) throw new Error('All-site HTTP/HTTPS access must be granted in the test installation.');
-    const tab = await chrome.tabs.create({ url: fixtureURL, active: false });
-    try {
-      for (let i = 0; i < 150 && (await chrome.tabs.get(tab.id)).status !== 'complete'; i++) await new Promise(resolve => setTimeout(resolve, 20));
-      const before = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => Boolean(document.querySelector('#still-command-bar')) });
-      if (before[0].result) throw new Error('Opening a website must not automatically inject the overlay.');
-      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['palette.js', 'content.js'] });
-      const css = await (await fetch(chrome.runtime.getURL('palette.css'))).text();
-      const response = await chrome.tabs.sendMessage(tab.id, { type: 'still:open', mode: 'new', css });
-      if (!response?.ok) throw new Error('The website content-script bridge must open the overlay.');
-      const after = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => Boolean(document.querySelector('#still-command-bar')?.isConnected) });
-      if (!after[0].result) throw new Error('The overlay host must exist on the website.');
-      return 'PASS: all-site access and the real website injection bridge work without a toolbar click';
-    } finally {
-      await chrome.tabs.remove(tab.id);
+    const tab = await chrome.tabs.create({ url: fixtureURL, active: true });
+    for (let i = 0; i < 150 && (await chrome.tabs.get(tab.id)).status !== 'complete'; i++) await new Promise(resolve => setTimeout(resolve, 20));
+    const before = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => Boolean(document.querySelector('#still-command-bar')) });
+    if (before[0].result) throw new Error('Opening a website must not automatically inject the overlay.');
+    let cachedIcon;
+    for (let i = 0; i < 100; i++) {
+      cachedIcon = (await chrome.runtime.sendMessage({ type: 'still:search', query: fixtureURL })).items[0]?.favicon;
+      if (cachedIcon) break;
+      await new Promise(resolve => setTimeout(resolve, 40));
     }
+    if (!cachedIcon?.startsWith('data:image/png;base64,')) throw new Error('Visited website favicon must be available from the browser cache.');
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['palette.js'] });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => {
+      // Test-only capture in the isolated world; production still uses closed roots.
+      const mount = globalThis.StillPalette.mount;
+      globalThis.__diarcOriginalMount = mount;
+      globalThis.StillPalette.mount = options => {
+        globalThis.__diarcTestRoot = options.root;
+        return mount(options);
+      };
+      const original = Element.prototype.attachShadow;
+      globalThis.__diarcOriginalAttach = original;
+      Element.prototype.attachShadow = function(options) {
+        const shadow = original.call(this, options);
+        if (this.id === 'still-command-bar') globalThis.__diarcTestShell = shadow;
+        return shadow;
+      };
+    } });
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+    const css = await (await fetch(chrome.runtime.getURL('palette.css'))).text();
+    const response = await chrome.tabs.sendMessage(tab.id, { type: 'still:open', mode: 'new', css });
+    if (!response?.ok) throw new Error('The website content-script bridge must open the overlay.');
+    await new Promise(resolve => setTimeout(resolve, 160));
+    const [inspection] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => {
+      Element.prototype.attachShadow = globalThis.__diarcOriginalAttach;
+      globalThis.StillPalette.mount = globalThis.__diarcOriginalMount;
+      const shell = globalThis.__diarcTestShell.querySelector('dialog');
+      const frame = shell.querySelector('iframe');
+      if (!shell.matches(':modal') || frame.hasAttribute('src') || frame.sandbox.value !== 'allow-same-origin') throw new Error('The input must use a script-free frame inside the outer native modal.');
+      if (getComputedStyle(shell, '::backdrop').backdropFilter !== 'blur(5px)') throw new Error('The parent backdrop must retain the configured blur.');
+      const root = globalThis.__diarcTestRoot;
+      const dialog = root?.querySelector('dialog');
+      const input = root?.querySelector('input');
+      document.querySelector('#site-input').focus();
+      if (!dialog?.matches(':modal') || root.activeElement !== input) throw new Error('Website autofocus must not escape the native modal.');
+      const bar = root.querySelector('.still-bar').getBoundingClientRect();
+      if (Math.abs(bar.y + bar.height / 2 - innerHeight / 3) > 1) throw new Error('The framed bar must keep its one-third position.');
+      const rect = input.getBoundingClientRect();
+      return { x: rect.x + Math.min(100, rect.width / 2), y: rect.y + rect.height / 2 };
+    } });
+    return { id: tab.id, ...inspection.result };
   }, fixtureURL));
+  const websiteRef = JSON.parse(await browser('--json', 'tab', 'list')).data.tabs.find(tab => tab.url === fixtureURL)?.tabId;
+  assert.ok(websiteRef, 'The fixture must have an automation tab reference.');
+  await browser('tab', websiteRef);
+  await browser('mouse', 'move', String(Math.round(website.x)), String(Math.round(website.y)));
+  await browser('mouse', 'down');
+  await browser('mouse', 'up');
+  await browser('keyboard', 'type', 'overlay focus test');
+  assert.match(await browser('snapshot', '-i'), /overlay focus test/, 'Real keystrokes must reach the overlay after clicking it.');
+  await evaluate(() => {
+    if (document.querySelector('#site-input').value !== '' || document.activeElement.id === 'site-input') throw new Error('Typing leaked into the site composer.');
+    if (globalThis.focusAttempts < 2) throw new Error('The fixture must repeatedly attempt to steal focus.');
+    if (globalThis.interceptedEvents !== 0) throw new Error('The website must not receive overlay pointer, typing, or paste events.');
+    return true;
+  });
+  await browser('press', 'Escape');
+  await evaluate(() => {
+    if (document.querySelector('#still-command-bar').style.display !== 'none' || document.activeElement.id !== 'site-input') throw new Error('Dismissing must restore the site composer.');
+    return true;
+  });
+  // Reopen the same content-script instance in address mode after dismissal.
+  await browser('tab', 'new', `${page}/options.html`);
+  console.log(await evaluate(async tabId => {
+    await chrome.storage.local.set({ backgroundBlur: false });
+    await chrome.tabs.update(tabId, { active: true });
+    const css = await (await fetch(chrome.runtime.getURL('palette.css'))).text();
+    const response = await chrome.tabs.sendMessage(tabId, { type: 'still:open', mode: 'address', css });
+    if (!response?.ok) throw new Error('The existing input frame must reopen.');
+    await new Promise(resolve => setTimeout(resolve, 100));
+    const [inspection] = await chrome.scripting.executeScript({ target: { tabId }, func: () => {
+      const root = globalThis.__diarcTestRoot;
+      const input = root.querySelector('input');
+      const shell = globalThis.__diarcTestShell.querySelector('dialog');
+      if (getComputedStyle(shell, '::backdrop').backdropFilter !== 'blur(0px)') throw new Error('Disabling blur must also update the parent backdrop.');
+      if (root.activeElement !== input || input.value !== location.href || input.selectionStart !== 0 || input.selectionEnd !== input.value.length) throw new Error('Reopening address mode must focus and select the original page URL.');
+      return true;
+    } });
+    if (!inspection.result) throw new Error('Address-mode inspection failed.');
+    return 'PASS: the isolated frame reopens in address mode and selects the current page URL';
+  }, website.id));
+  await browser('tab', websiteRef);
+  await browser('keyboard', 'type', 'reopened focus test');
+  assert.match(await browser('snapshot', '-i'), /reopened focus test/, 'Typing after reopening must replace the selected address.');
+  await evaluate(() => {
+    if (document.querySelector('#site-input').value !== '' || globalThis.interceptedEvents !== 0) throw new Error('The site intercepted typing after reopening.');
+    return true;
+  });
+  await browser('press', 'Escape');
+  await evaluate(() => {
+    if (document.querySelector('#still-command-bar').style.display !== 'none' || document.activeElement.id !== 'site-input') throw new Error('Closing the reopened frame must restore page focus.');
+    return true;
+  });
+  await browser('tab', 'close');
+  console.log('PASS: cached favicon, strict CSP, blocked page capture handlers, clicked typing, repeated opens, and focus restoration');
   assert.equal(await browser('errors'), '', 'The browser must not report page errors.');
 } finally {
   await browser('close').catch(() => {});

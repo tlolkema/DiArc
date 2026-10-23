@@ -15,23 +15,31 @@
   line-height: 1.4;
   color: var(--still-text);
   color-scheme: light;
+  --still-top: max(24px, calc(100dvh / 3 - 35px));
   position: fixed;
   inset: 0;
+  margin: 0;
+  border: 0;
+  outline: none;
+  max-width: none;
+  max-height: none;
+  overflow: hidden;
   width: 100%;
   height: 100%;
   display: flex;
   justify-content: center;
-  align-items: center;
-  padding: 24px;
+  align-items: flex-start;
+  padding: var(--still-top) 24px 24px;
   isolation: isolate;
   text-align: left;
   -webkit-font-smoothing: antialiased;
 }
-.still-layer[hidden], .still-layer [hidden] { display: none !important; }
+.still-layer:not([open]), .still-layer[hidden], .still-layer [hidden] { display: none !important; }
+.still-layer::backdrop { background: transparent; }
 .still-layer.is-overlay { background: rgb(35 30 25 / 10%); backdrop-filter: blur(var(--still-background-blur, 5px)); }
 .still-panel {
   width: min(var(--still-overlay-width, 75vh), 100%);
-  max-height: min(var(--still-overlay-height, 75vh), calc(100dvh - 48px));
+  max-height: min(var(--still-overlay-height, 75vh), calc(100dvh - var(--still-top) - 24px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -45,6 +53,7 @@
 .still-search-icon { color: #999999; display: flex; }
 .still-icon { display: inline-flex; width: 21px; height: 21px; flex: 0 0 21px; align-items: center; justify-content: center; }
 .still-icon svg { display: block; width: 100%; height: 100%; }
+.still-favicon { display: block; width: 20px; height: 20px; object-fit: contain; border-radius: 4px; }
 .still-input {
   all: unset;
   color: var(--still-text);
@@ -104,12 +113,12 @@
   }
 }
 @media (max-width: 540px) {
-  .still-layer { padding: 14px; }
-  .still-panel { border-radius: 22px; max-height: min(var(--still-overlay-height, 75vh), calc(100dvh - 28px)); }
+  .still-layer { --still-top: max(14px, calc(100dvh / 3 - 33px)); padding: var(--still-top) 14px 14px; }
+  .still-panel { border-radius: 22px; max-height: min(var(--still-overlay-height, 75vh), calc(100dvh - var(--still-top) - 14px)); }
   .still-bar { padding: 0 14px 0 18px; gap: 10px; min-height: 64px; }
   .still-input { font-size: 16px; height: 64px; }
   .still-source { display: none; }
   .still-footer { padding: 12px 16px; font-size: 10px; }
 }
-@keyframes still-appear { from { opacity: 0; transform: scale(.985); } to { opacity: 1; transform: scale(1); } }
+@keyframes still-appear { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .still-panel { animation: none; } .still-submit { transition: none; } }
