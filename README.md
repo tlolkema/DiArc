@@ -29,5 +29,3 @@
 - **↑ ↓** to select · **Enter** to open · **Esc** to dismiss.
 
 Customize sources, quick actions, size, and blur in **Settings**. Changes save automatically.
-
-No build step. No tracking. Browser-protected pages cannot display the overlay. Native shortcuts may remain reserved.
