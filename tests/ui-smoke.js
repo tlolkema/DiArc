@@ -58,6 +58,39 @@ try {
     check(document.querySelectorAll('.local-nav a').length === 4, 'Settings navigation must expose all sections.');
     check(document.querySelector('#overlayWidth').value === '75vh' && document.querySelector('#overlayHeight').value === '75vh', 'Both default dimensions must use vh.');
     check(document.querySelectorAll('[name="enabledQuickActions"]:checked').length === 0, 'All built-in actions must start disabled.');
+    const accessCard = document.querySelector('#site-access-card');
+    const grantAccess = document.querySelector('#grant-site-access');
+    const accessStatus = document.querySelector('#site-access-status');
+    await wait(() => accessCard.dataset.state === 'granted');
+    check(grantAccess.hidden, 'Already-granted access must not ask for another permission prompt.');
+    const originalContains = chrome.permissions.contains.bind(chrome.permissions);
+    const originalRequest = chrome.permissions.request.bind(chrome.permissions);
+    let allowed = false, approve = false, fail = false, permissionRequests = 0;
+    chrome.permissions.contains = async () => allowed;
+    chrome.permissions.request = async request => {
+      permissionRequests++;
+      check(JSON.stringify(request.origins) === '["http://*/*","https://*/*"]', 'Only declared website permissions should be requested.');
+      if (fail) throw new Error('Blocked by browser policy');
+      allowed = approve;
+      return approve;
+    };
+    window.dispatchEvent(new Event('focus'));
+    await wait(() => accessCard.dataset.state === 'missing');
+    check(permissionRequests === 0 && !grantAccess.hidden && !grantAccess.disabled, 'Missing access must show an action without automatically prompting.');
+    grantAccess.click();
+    await wait(() => accessStatus.textContent.includes('Access was not granted'));
+    check(!grantAccess.disabled && !document.querySelector('#manage-site-access').hidden, 'Denied access must offer retry and manual management.');
+    fail = true;
+    grantAccess.click();
+    await wait(() => accessStatus.textContent.includes('Blocked by browser policy'));
+    fail = false; approve = true;
+    grantAccess.click();
+    await wait(() => accessCard.dataset.state === 'granted');
+    check(permissionRequests === 3 && grantAccess.hidden, 'Approval must recheck access and hide the request action.');
+    chrome.permissions.contains = originalContains;
+    chrome.permissions.request = originalRequest;
+    window.dispatchEvent(new Event('focus'));
+    await wait(() => accessCard.dataset.state === 'granted');
     for (const field of document.querySelectorAll('.select-field')) {
       const select = field.querySelector('select').getBoundingClientRect();
       const chevron = field.querySelector('.select-chevron').getBoundingClientRect();
@@ -142,20 +175,22 @@ try {
     await wait(saved);
     await chrome.bookmarks.create({ title: 'Design bookmark', url: 'https://design.example/saved' });
     await chrome.history.addUrl({ url: 'https://design.example/history' });
-    return 'PASS: automatic saving, source order, validation, serialized writes, storage failure recovery, persistence';
+    return 'PASS: permission checks and guided approval, automatic saving, source order, validation, serialized writes, storage failure recovery, persistence';
   }));
   console.log(await evaluate(async () => {
     const check = (value, message) => { if (!value) throw new Error(message); };
     const wait = async predicate => {
       for (let i = 0; i < 300; i++) { if (await predicate()) return; await new Promise(resolve => setTimeout(resolve, 10)); }
-      throw new Error('Timed out waiting for customization.');
+      throw new Error(`Timed out waiting for customization at ${location.href}.`);
     };
     const saved = () => document.querySelector('#save-status').textContent.includes('Saved automatically.');
     const edit = (field, value) => {
       field.value = value;
       field.dispatchEvent(new Event('input', { bubbles: true }));
     };
+    await wait(() => document.querySelector('#backgroundBlur') && document.querySelector('#settings-fields')?.disabled === false);
     const blurToggle = document.querySelector('#backgroundBlur');
+    check(Boolean(blurToggle), `Customization fixture is unavailable at ${location.href}.`);
     check(blurToggle.type === 'checkbox' && blurToggle.checked, 'Background blur must be an on/off toggle, enabled by default.');
     edit(document.querySelector('#overlayWidth'), '50vw');
     edit(document.querySelector('#overlayHeight'), '65vh');

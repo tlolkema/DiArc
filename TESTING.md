@@ -7,7 +7,7 @@ npm test
 npm run check
 ```
 
-The 48 dependency-free Node tests cover:
+The 56 dependency-free Node tests cover:
 
 - Settings open automatically on first install, not on updates or browser upgrades
 - Settings defaults, validation, result limits, and migration of older preferences
@@ -24,6 +24,9 @@ The 48 dependency-free Node tests cover:
 - On-demand injection and toolbar warning reset
 - No native new-tab override or launcher files
 - HTTP/HTTPS access on all sites, without automatic content scripts
+- Automatic permission checks never open a native prompt
+- A user click requests missing access before yielding its user gesture
+- Declined, blocked, unsupported, repeated, and stale permission requests are handled safely
 - Browser-protected pages remain unavailable for overlays
 - DiArc branding and the supplied rainbow logo before the wordmark
 - Keyboard setup appears first with a clickable shortcut-configuration URL
@@ -46,6 +49,10 @@ The suite uses a disposable browser session with the production manifest. It doe
 
 ### Settings checks
 
+- Existing access is recognized without an unnecessary permission prompt
+- Missing access displays a one-click permission request
+- Denial and browser-policy failures offer retry and manual site-access management
+- Approval rechecks the actual grant and hides the request button
 - Supplied rainbow logo at 80 px, wordmark at 56 px, alignment, a larger subtitle, and section navigation
 - Keyboard appears first; the prominent configuration URL opens the actual browser shortcut page
 - Centered dropdown chevrons with a 12 px inset on desktop and mobile

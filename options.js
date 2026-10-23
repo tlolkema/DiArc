@@ -1,4 +1,5 @@
 import { DEFAULTS, settingsFrom, validOverlayLength, validActionTemplate, normalizeCustomAction } from './core.js';
+import { createSiteAccessController } from './site-access.js';
 const form = document.querySelector('#settings');
 const status = document.querySelector('#save-status');
 const sourceList = document.querySelector('#source-list');
@@ -10,6 +11,32 @@ let preferences = settingsFrom();
 let ready = false;
 let saveQueue = Promise.resolve();
 let saveRevision = 0;
+
+const accessCard = document.querySelector('#site-access-card');
+const accessStatus = document.querySelector('#site-access-status');
+const grantAccess = document.querySelector('#grant-site-access');
+const manageAccess = document.querySelector('#manage-site-access');
+const siteAccess = createSiteAccessController({
+  permissions: chrome.permissions,
+  onChange({ status, message, canRequest }) {
+    accessCard.dataset.state = status;
+    accessStatus.textContent = message;
+    const granted = status === 'granted';
+    grantAccess.hidden = granted || !canRequest || status === 'checking';
+    grantAccess.disabled = status === 'requesting' || status === 'checking';
+    grantAccess.textContent = status === 'requesting' ? 'Waiting for permission…' : 'Allow access to all websites';
+    manageAccess.hidden = granted || status === 'checking';
+  }
+});
+grantAccess.addEventListener('click', () => { void siteAccess.requestAccess(); });
+manageAccess.addEventListener('click', async () => {
+  try { await chrome.tabs.create({ url: `chrome://extensions/?id=${chrome.runtime.id}` }); }
+  catch (error) { accessStatus.textContent = `Could not open site-access settings. ${error.message}`; }
+});
+chrome.permissions?.onAdded?.addListener(() => { void siteAccess.refresh(); });
+chrome.permissions?.onRemoved?.addListener(() => { void siteAccess.refresh(); });
+window.addEventListener('focus', () => { void siteAccess.refresh(); });
+void siteAccess.refresh();
 
 const isMac = /mac/i.test(navigator.userAgentData?.platform || navigator.platform || '');
 for (const [id, mac, other] of [

@@ -93,6 +93,16 @@ input[type="number"] { width: 70px; text-align: center; font-variant-numeric: ta
 .add-action:disabled { color: var(--muted); cursor: default; }
 .autosave-status { min-height: 22px; margin: 0 0 44px; padding-top: 4px; font-size: 11px; color: var(--muted); }
 input[aria-invalid="true"] { outline: 1px solid var(--text); outline-offset: 2px; }
+.site-access-card { margin-bottom: 24px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.site-access-card h2 { font-size: 12px; margin-bottom: 5px; }
+.site-access-card p { margin: 0; color: var(--muted); font-size: 11px; }
+.site-access-card [hidden] { display: none !important; }
+.site-access-card[data-state="granted"] { padding: 12px 16px; background: var(--control); }
+.site-access-card[data-state="granted"] h2 { display: none; }
+.site-access-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.site-access-button { margin-top: 12px; padding: 10px 14px; border: 0; border-radius: 8px; background: var(--accent); color: var(--button-text); font-size: 11px; cursor: pointer; }
+.site-access-button:disabled { opacity: .6; cursor: default; }
+.site-access-manage { margin-top: 12px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 11px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .shortcut-setup { padding: 22px; margin-bottom: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .shortcut-setup > p { margin: 0 0 8px; color: var(--muted); font-size: 12px; }
 .shortcut-setup .shortcut-setup-title { color: var(--text); font-size: 15px; font-weight: 600; }

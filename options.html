@@ -29,6 +29,14 @@
           <p>A few thoughtful controls. A little less in your way.</p>
         </header>
         <section id="keyboard" aria-labelledby="shortcuts-heading">
+          <aside id="site-access-card" class="site-access-card" data-state="checking" aria-labelledby="site-access-heading">
+            <h2 id="site-access-heading">Website access</h2>
+            <p id="site-access-status" role="status" aria-live="polite">Checking website access…</p>
+            <div class="site-access-actions">
+              <button id="grant-site-access" class="site-access-button" type="button" disabled hidden>Allow access to all websites</button>
+              <button id="manage-site-access" class="site-access-manage" type="button" hidden>Manage site access</button>
+            </div>
+          </aside>
           <div class="section-heading"><h2 id="shortcuts-heading">Keyboard shortcuts</h2><p>Your command bar starts with the right keys.</p></div>
           <div class="shortcut-setup">
             <p class="shortcut-setup-title">Set your keyboard shortcuts</p>
